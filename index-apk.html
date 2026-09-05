@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#667eea">
+    <title>يومك بيدك - Life Organizer</title>
+    <script src="cordova.js"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Tajawal:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { direction: rtl; -webkit-user-select: none; user-select: none; }
+        html, body, #root { margin: 0; padding: 0; font-family: 'Cairo', 'Tajawal', sans-serif; min-height: 100vh; max-height: 100vh; overflow: hidden; }
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        #root { overflow-y: auto; overflow-x: hidden; -webkit-touch-callout: none; }
+        .text-gradient { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .btn-gradient { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); transition: all 0.3s ease; }
+        .btn-gradient:active { transform: scale(0.95); }
+        .card-hover { transition: all 0.3s ease; }
+        textarea, input[type="text"], input[type="number"] { text-align: right; font-size: 16px; }
+        button { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+        input { -webkit-user-select: text; user-select: text; }
+        @media (max-width: 768px) { body { font-size: 14px; } .text-3xl { font-size: 1.875rem; } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script>
+        const { useState, useEffect } = React;
+
+        function Home({ setCurrentPage }) {
+            const features = [
+                { id: 1, title: 'مهام أيام الأسبوع', description: 'خطط مهامك لكل يوم', icon: '📅', page: 'weekly' },
+                { id: 2, title: 'الخطة الذهنية', description: 'اكتب خطتك الشاملة', icon: '🧠', page: 'mindmap' },
+                { id: 3, title: 'تدوين حر وتذكير', description: 'ملاحظاتك اليومية', icon: '📝', page: 'notes' },
+                { id: 4, title: 'المخطط الدراسي', description: 'نظم مواضيعك الدراسية', icon: '📚', page: 'study' },
+                { id: 5, title: 'المنبه', description: 'اضبط منبهاً للمهام', icon: '⏰', page: 'alarm' },
+                { id: 6, title: 'المحفوظات', description: 'عرض بياناتك المحفوظة', icon: '📦', page: 'archive' }
+            ];
+
+            return (
+                <main className="min-h-screen pb-20">
+                    <div className="max-w-6xl mx-auto px-4 py-12">
+                        <div className="text-center mb-16">
+                            <h2 className="text-4xl font-bold text-white mb-4">يومك بيدك</h2>
+                            <p className="text-lg text-gray-100">استثمره بحكمة</p>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {features.map((f) => (
+                                <button key={f.id} onClick={() => setCurrentPage(f.page)} className="card-hover">
+                                    <div className="bg-white rounded-2xl shadow-md p-6 text-left hover:shadow-2xl">
+                                        <div className="text-5xl mb-3">{f.icon}</div>
+                                        <h3 className="text-xl font-bold text-gray-800 mb-2">{f.title}</h3>
+                                        <p className="text-gray-600 text-sm">{f.description}</p>
+                                        <div className="mt-4 text-purple-600 flex justify-end gap-1">
+                                            <span>←</span>
+                                        </div>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </main>
+            );
+        }
+
+        function WeeklyTasks({ setCurrentPage }) {
+            const days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+            const [selectedDay, setSelectedDay] = useState(null);
+            const [tasks, setTasks] = useState({});
+            const [currentText, setCurrentText] = useState('');
+
+            useEffect(() => {
+                const saved = localStorage.getItem('weeklyTasks');
+                if (saved) setTasks(JSON.parse(saved));
+            }, []);
+
+            const handleDayClick = (day) => { setSelectedDay(day); setCurrentText(tasks[day] || ''); };
+            const handleSave = () => {
+                if (selectedDay) {
+                    const updated = { ...tasks, [selectedDay]: currentText };
+                    setTasks(updated);
+                    localStorage.setItem('weeklyTasks', JSON.stringify(updated));
+                    alert('✓ تم حفظ المهام!');
+                }
+            };
+
+            return (
+                <main className="min-h-screen pb-20">
+                    <div className="max-w-4xl mx-auto px-4 py-8">
+                        <button onClick={() => setCurrentPage('home')} className="mb-6 px-4 py-2 bg-white text-gray-800 rounded-lg">← رجوع</button>
+                        <h1 className="text-3xl font-bold text-white mb-8">مهام الأسبوع</h1>
+                        {!selectedDay ? (
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                {days.map((day, i) => (
+                                    <button key={i} onClick={() => handleDayClick(day)} className="bg-white p-4 rounded-lg text-left">
+                                        <h2 className="font-bold text-gray-800">{day}</h2>
+                                        <p className="text-sm text-gray-600">{tasks[day] ? tasks[day].length + ' حرف' : 'فارغ'}</p>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="bg-white rounded-lg p-6">
+                                <h2 className="text-2xl font-bold mb-4">مهام {selectedDay}</h2>
+                                <textarea value={currentText} onChange={(e) => e.target.value.length <= 10000 && setCurrentText(e.target.value)} maxLength={10000} className="w-full h-96 p-4 border rounded-lg" placeholder="اكتب مهامك..."/>
+                                <div className="text-sm text-gray-500 mt-2">{currentText.length}/10000</div>
+                                <div className="mt-6 flex gap-3">
+                                    <button onClick={() => setSelectedDay(null)} className="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg">رجوع</button>
+                                    <button onClick={handleSave} className="flex-1 px-4 py-2 btn-gradient text-white rounded-lg">💾 حفظ</button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </main>
+            );
+        }
+
+        function MindMap({ setCurrentPage }) {
+            const [plan, setPlan] = useState('');
+            const [saved, setSaved] = useState(false);
+
+            useEffect(() => {
+                const saved = localStorage.getItem('mindMap');
+                if (saved) setPlan(saved);
+            }, []);
+
+            const handleSave = () => {
+                localStorage.setItem('mindMap', plan);
+                setSaved(true);
+                setTimeout(() => setSaved(false), 2000);
+            };
+
+            return (
+                <main className="min-h-screen pb-20">
+                    <div className="max-w-4xl mx-auto px-4 py-8">
+                        <button onClick={() => setCurrentPage('home')} className="mb-6 px-4 py-2 bg-white text-gray-800 rounded-lg">← رجوع</button>
+                        <h1 className="text-3xl font-bold text-white mb-4">الخطة الذهنية 🧠</h1>
+                        <div className="bg-white rounded-lg p-6">
+                            <textarea value={plan} onChange={(e) => setPlan(e.target.value)} className="w-full h-80 p-4 border rounded-lg" placeholder="اكتب خطتك الشاملة..."/>
+                            <div className="mt-4 flex gap-3">
+                                <button onClick={handleSave} className="flex-1 px-4 py-2 btn-gradient text-white rounded-lg">💾 حفظ</button>
+                            </div>
+                            {saved && <div className="mt-2 p-2 bg-green-100 text-green-700 rounded">✓ تم الحفظ!</div>}
+                        </div>
+                    </div>
+                </main>
+            );
+        }
+
+        function FreeNotes({ setCurrentPage }) {
+            const [notes, setNotes] = useState('');
+            const [saved, setSaved] = useState(false);
+
+            useEffect(() => {
+                const saved = localStorage.getItem('freeNotes');
+                if (saved) setNotes(saved);
+            }, []);
+
+            const handleSave = () => {
+                localStorage.setItem('freeNotes', notes);
+                setSaved(true);
+                setTimeout(() => setSaved(false), 2000);
+            };
+
+            return (
+                <main className="min-h-screen pb-20">
+                    <div className="max-w-4xl mx-auto px-4 py-8">
+                        <button onClick={() => setCurrentPage('home')} className="mb-6 px-4 py-2 bg-white text-gray-800 rounded-lg">← رجوع</button>
+                        <h1 className="text-3xl font-bold text-white mb-4">ملاحظاتي 📝</h1>
+                        <div className="bg-white rounded-lg p-6">
+                            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full h-96 p-4 border rounded-lg" placeholder="اكتب ملاحظاتك..."/>
+                            <div className="mt-4 flex gap-3">
+                                <button onClick={handleSave} className="flex-1 px-4 py-2 btn-gradient text-white rounded-lg">💾 حفظ</button>
+                            </div>
+                            {saved && <div className="mt-2 p-2 bg-green-100 text-green-700 rounded">✓ تم الحفظ!</div>}
+                        </div>
+                    </div>
+                </main>
+            );
+        }
+
+        function StudyPlan({ setCurrentPage }) {
+            const [subjects, setSubjects] = useState([]);
+            const [newSubject, setNewSubject] = useState('');
+            const [newHours, setNewHours] = useState('');
+            const [saved, setSaved] = useState(false);
+
+            useEffect(() => {
+                const saved = localStorage.getItem('studyPlan');
+                if (saved) setSubjects(JSON.parse(saved));
+            }, []);
+
+            const handleAdd = () => {
+                if (newSubject.trim() && newHours && subjects.length < 15) {
+                    setSubjects([...subjects, { id: Date.now(), name: newSubject, hours: parseFloat(newHours) }]);
+                    setNewSubject('');
+                    setNewHours('');
+                }
+            };
+
+            const handleSave = () => {
+                localStorage.setItem('studyPlan', JSON.stringify(subjects));
+                setSaved(true);
+                setTimeout(() => setSaved(false), 2000);
+            };
+
+            const total = subjects.reduce((sum, s) => sum + s.hours, 0);
+
+            return (
+                <main className="min-h-screen pb-20">
+                    <div className="max-w-4xl mx-auto px-4 py-8">
+                        <button onClick={() => setCurrentPage('home')} className="mb-6 px-4 py-2 bg-white text-gray-800 rounded-lg">← رجوع</button>
+                        <h1 className="text-3xl font-bold text-white mb-4">المخطط الدراسي 📚</h1>
+                        <div className="bg-white rounded-lg p-6">
+                            <div className="mb-6 p-4 bg-purple-50 rounded-lg">
+                                <h2 className="font-bold mb-3">إضافة موضوع</h2>
+                                <input type="text" value={newSubject} onChange={(e) => setNewSubject(e.target.value)} placeholder="اسم الموضوع" className="w-full mb-2 p-2 border rounded"/>
+                                <input type="number" value={newHours} onChange={(e) => setNewHours(e.target.value)} placeholder="الساعات" step="0.5" className="w-full mb-2 p-2 border rounded"/>
+                                <button onClick={handleAdd} className="w-full px-4 py-2 btn-gradient text-white rounded">➕ إضافة</button>
+                            </div>
+                            {subjects.length > 0 && (
+                                <>
+                                    <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-4 rounded mb-4 font-bold">
+                                        الإجمالي: {total} ساعة
+                                    </div>
+                                    <div className="space-y-2">
+                                        {subjects.map((s) => (
+                                            <div key={s.id} className="flex justify-between p-3 bg-gray-100 rounded">
+                                                <span>{s.name}</span>
+                                                <span className="font-bold">{s.hours}h</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                            <button onClick={handleSave} className="w-full mt-4 px-4 py-2 btn-gradient text-white rounded">💾 حفظ</button>
+                            {saved && <div className="mt-2 p-2 bg-green-100 text-green-700 rounded">✓ تم الحفظ!</div>}
+                        </div>
+                    </div>
+                </main>
+            );
+        }
+
+        function Alarm({ setCurrentPage }) {
+            const [minutes, setMinutes] = useState('');
+            const [isRunning, setIsRunning] = useState(false);
+            const [timeLeft, setTimeLeft] = useState(0);
+            const [showAlert, setShowAlert] = useState(false);
+
+            useEffect(() => {
+                let interval;
+                if (isRunning && timeLeft > 0) {
+                    interval = setInterval(() => setTimeLeft(p => p - 1), 1000);
+                } else if (timeLeft === 0 && isRunning) {
+                    setIsRunning(false);
+                    setShowAlert(true);
+                }
+                return () => clearInterval(interval);
+            }, [isRunning, timeLeft]);
+
+            const handleStart = () => {
+                if (minutes && !isNaN(minutes) && minutes > 0) {
+                    setTimeLeft(parseInt(minutes) * 60);
+                    setIsRunning(true);
+                }
+            };
+
+            const formatTime = (s) => {
+                const h = Math.floor(s / 3600);
+                const m = Math.floor((s % 3600) / 60);
+                const sec = s % 60;
+                return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+            };
+
+            return (
+                <main className="min-h-screen pb-20 flex items-center justify-center">
+                    <div className="max-w-2xl w-full mx-auto px-4">
+                        <button onClick={() => setCurrentPage('home')} className="mb-6 px-4 py-2 bg-white text-gray-800 rounded-lg">← رجوع</button>
+                        <h1 className="text-3xl font-bold text-white text-center mb-8">المنبه ⏰</h1>
+                        <div className="bg-white rounded-2xl p-8">
+                            {!isRunning ? (
+                                <>
+                                    <input type="number" value={minutes} onChange={(e) => setMinutes(e.target.value)} placeholder="الدقائق" className="w-full text-3xl p-4 border-2 border-purple-500 rounded-lg mb-6 text-center"/>
+                                    <button onClick={handleStart} className="w-full px-8 py-6 btn-gradient text-white text-xl font-bold rounded-lg">▶️ ابدأ</button>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="text-6xl font-bold text-center mb-8 p-6 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg">{formatTime(timeLeft)}</div>
+                                    <button onClick={() => { setIsRunning(false); setTimeLeft(0); setMinutes(''); }} className="w-full px-8 py-6 bg-red-500 text-white text-xl font-bold rounded-lg">⏹️ إيقاف</button>
+                                </>
+                            )}
+                        </div>
+                        {showAlert && (
+                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                                <div className="bg-white rounded-2xl p-8 text-center max-w-sm">
+                                    <div className="text-6xl mb-4">🔔</div>
+                                    <h2 className="text-3xl font-bold text-red-600 mb-4">انتهى الوقت!</h2>
+                                    <button onClick={() => setShowAlert(false)} className="w-full px-6 py-3 btn-gradient text-white rounded-lg">تمام</button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </main>
+            );
+        }
+
+        function Archive({ setCurrentPage }) {
+            const [data, setData] = useState({ weeklyTasks: {}, mindMap: '', freeNotes: '', studyPlan: [] });
+            const [expandedSections, setExpandedSections] = useState({ weekly: true, mindmap: false, notes: false, study: false });
+
+            useEffect(() => {
+                setData({
+                    weeklyTasks: JSON.parse(localStorage.getItem('weeklyTasks') || '{}'),
+                    mindMap: localStorage.getItem('mindMap') || '',
+                    freeNotes: localStorage.getItem('freeNotes') || '',
+                    studyPlan: JSON.parse(localStorage.getItem('studyPlan') || '[]')
+                });
+            }, []);
+
+            const toggleSection = (s) => setExpandedSections(p => ({ ...p, [s]: !p[s] }));
+
+            return (
+                <main className="min-h-screen pb-20">
+                    <div className="max-w-4xl mx-auto px-4 py-8">
+                        <button onClick={() => setCurrentPage('home')} className="mb-6 px-4 py-2 bg-white text-gray-800 rounded-lg">← رجوع</button>
+                        <h1 className="text-3xl font-bold text-white mb-8">المحفوظات 📦</h1>
+                        <div className="bg-white rounded-lg p-6 space-y-4">
+                            {['weekly', 'mindmap', 'notes', 'study'].map((section) => (
+                                <div key={section}>
+                                    <button onClick={() => toggleSection(section)} className="w-full p-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg font-bold flex justify-between">
+                                        <span>{['مهام الأسبوع', 'الخطة الذهنية', 'الملاحظات', 'المخطط'][['weekly', 'mindmap', 'notes', 'study'].indexOf(section)]}</span>
+                                        {expandedSections[section] ? '▲' : '▼'}
+                                    </button>
+                                    {expandedSections[section] && (
+                                        <div className="mt-2 p-3 bg-gray-50 rounded-lg text-sm">
+                                            {section === 'weekly' && Object.keys(data.weeklyTasks).length ? (
+                                                Object.entries(data.weeklyTasks).map(([day, tasks]) => (
+                                                    <div key={day} className="p-2 mb-2 bg-white rounded border-r-4 border-blue-500">
+                                                        <strong>{day}</strong>: {tasks.substring(0, 50)}...
+                                                    </div>
+                                                ))
+                                            ) : section === 'mindmap' && data.mindMap ? (
+                                                <div className="p-2 bg-white rounded">{data.mindMap.substring(0, 100)}...</div>
+                                            ) : section === 'notes' && data.freeNotes ? (
+                                                <div className="p-2 bg-white rounded">{data.freeNotes.substring(0, 100)}...</div>
+                                            ) : section === 'study' && data.studyPlan.length ? (
+                                                <div>{data.studyPlan.map((s) => <div key={s.id} className="p-2">{s.name}: {s.hours}h</div>)}</div>
+                                            ) : (
+                                                <p className="text-gray-500">لا توجد بيانات</p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </main>
+            );
+        }
+
+        function Header() {
+            return (
+                <header className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg sticky top-0 z-50">
+                    <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+                        <h1 className="text-2xl font-bold">🏠 يومك بيدك</h1>
+                        <p className="text-xs text-purple-100">استثمره بحكمة</p>
+                    </div>
+                </header>
+            );
+        }
+
+        function App() {
+            const [currentPage, setCurrentPage] = useState('home');
+
+            const renderPage = () => {
+                const components = { weekly: WeeklyTasks, mindmap: MindMap, notes: FreeNotes, study: StudyPlan, alarm: Alarm, archive: Archive };
+                const Component = components[currentPage] || Home;
+                return <Component setCurrentPage={setCurrentPage} />;
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-b from-purple-100 via-white to-gray-50">
+                    <Header />
+                    {renderPage()}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
