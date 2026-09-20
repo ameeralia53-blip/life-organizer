@@ -177,6 +177,14 @@ function App() {
     setMindMap('');
     setNotes('');
     setSubjects([]);
+    setSelectedDay(null);
+    setTaskText('');
+    setNewSubject('');
+    setNewHours('');
+    setMinutes('');
+    setTimeLeft(0);
+    setIsRunning(false);
+    setShowAlert(false);
     notify('تم مسح جميع البيانات');
   };
 
@@ -188,6 +196,7 @@ function App() {
     ['المنبه', 'تنبيهات دقيقة', '⏰', 'alarm'],
     ['المحفوظات الشاملة', 'اعرض بياناتك', '📦', 'archive'],
   ];
+  const hasWeeklyTasks = Object.keys(weeklyTasks).length > 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-100 via-white to-gray-50" dir="rtl">
@@ -226,7 +235,61 @@ function App() {
 
       {page === 'alarm' && <main className="max-w-2xl mx-auto px-4 py-20 flex flex-col items-center rtl-text"><button onClick={goHome} className="mb-6 px-4 py-2 bg-white rounded-lg">← العودة</button><h1 className="text-3xl font-bold text-gradient mb-12">المنبه</h1><div className="bg-white rounded-2xl p-8 w-full">{!isRunning ? <><input type="number" value={minutes} onChange={(event) => setMinutes(event.target.value)} min="1" placeholder="عدد الدقائق" className="rtl-text w-full text-3xl p-4 border-4 border-purple-500 rounded-lg mb-6" /><button onClick={startAlarm} className="w-full px-8 py-6 btn-gradient text-white text-xl font-bold rounded-lg">ابدأ المنبه</button></> : <><div className="text-6xl font-bold text-center mb-6 p-6 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg" dir="ltr">{formatTime(timeLeft)}</div><button onClick={stopAlarm} className="w-full px-8 py-6 bg-red-500 text-white text-xl font-bold rounded-lg">إيقاف المنبه</button></>}</div>{showAlert && <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-2xl p-8 text-center max-w-sm w-full"><div className="text-6xl mb-4">🔔</div><h2 className="text-3xl font-bold text-red-600 mb-4">انتهى الوقت!</h2><button onClick={() => setShowAlert(false)} className="px-6 py-3 btn-gradient text-white rounded-lg">تم</button></div></div>}</main>}
 
-      {page === 'archive' && <main className="max-w-4xl mx-auto px-4 py-8 pb-20 rtl-text"><button onClick={goHome} className="mb-6 px-4 py-2 bg-white rounded-lg">← العودة</button><h1 className="text-3xl font-bold text-gradient mb-8">المحفوظات</h1><div className="bg-white rounded-2xl shadow-lg p-8"><h2 className="font-bold text-lg text-blue-700 mb-3">مهام الأسبوع</h2>{Object.keys(weeklyTasks).length ? Object.entries(weeklyTasks).map(([day, tasks]) => <div key={day} className="p-3 mb-2 bg-blue-50 rounded"><strong>{day}:</strong> {tasks}</div>) : <p className="text-gray-500">لا توجد مهام مؤرشفة</p>}<div className="flex gap-3 flex-wrap mt-8"><button onClick={downloadData} className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold">تصدير البيانات</button><button onClick={clearAll} className="px-6 py-3 bg-red-500 text-white rounded-lg font-semibold">مسح جميع البيانات</button></div></div></main>}
+      {page === 'archive' && (
+        <main className="max-w-4xl mx-auto px-4 py-8 pb-20 rtl-text">
+          <button onClick={goHome} className="mb-6 px-4 py-2 bg-white rounded-lg">← العودة</button>
+          <h1 className="text-3xl font-bold text-gradient mb-8">المحفوظات</h1>
+          <div className="bg-white rounded-2xl shadow-lg p-8 space-y-8">
+            <section>
+              <h2 className="font-bold text-lg text-blue-700 mb-3">مهام الأسبوع</h2>
+              {hasWeeklyTasks ? (
+                Object.entries(weeklyTasks).map(([day, tasks]) => (
+                  <div key={day} className="p-3 mb-2 bg-blue-50 rounded">
+                    <strong>{day}:</strong> {tasks || '—'}
+                  </div>
+                ))
+              ) : (
+                <p className="text-gray-500">لا توجد مهام مؤرشفة</p>
+              )}
+            </section>
+
+            <section>
+              <h2 className="font-bold text-lg text-purple-700 mb-3">الخطة الذهنية</h2>
+              <div className="p-3 bg-purple-50 rounded whitespace-pre-wrap break-words">
+                {mindMap.trim() || 'لا توجد خطة ذهنية محفوظة'}
+              </div>
+            </section>
+
+            <section>
+              <h2 className="font-bold text-lg text-emerald-700 mb-3">الملاحظات الحرة</h2>
+              <div className="p-3 bg-emerald-50 rounded whitespace-pre-wrap break-words">
+                {notes.trim() || 'لا توجد ملاحظات محفوظة'}
+              </div>
+            </section>
+
+            <section>
+              <h2 className="font-bold text-lg text-pink-700 mb-3">المخطط الدراسي</h2>
+              {subjects.length > 0 ? (
+                <div className="space-y-2">
+                  {subjects.map((subject) => (
+                    <div key={subject.id} className="p-3 bg-pink-50 rounded flex justify-between gap-2">
+                      <span>{subject.name}</span>
+                      <span>{subject.hours} ساعة</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500">لا توجد مواضيع دراسية محفوظة</p>
+              )}
+            </section>
+
+            <div className="flex gap-3 flex-wrap">
+              <button onClick={downloadData} className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold">تصدير البيانات</button>
+              <button onClick={clearAll} className="px-6 py-3 bg-red-500 text-white rounded-lg font-semibold">مسح جميع البيانات</button>
+            </div>
+          </div>
+        </main>
+      )}
     </div>
   );
 }
