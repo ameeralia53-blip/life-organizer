@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 const days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
 const emojis = ['🌅', '📆', '🌤️', '☀️', '🌞', '🌈', '🌙'];
@@ -17,296 +17,216 @@ function App() {
   const [timeLeft, setTimeLeft] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [showAlert, setShowAlert] = useState(false);
-  const [savingMessage, setSavingMessage] = useState('');
+  const [message, setMessage] = useState('');
+  const messageTimer = useRef(null);
 
-  // تحميل البيانات من localStorage
+  const notify = (text) => {
+    setMessage(text);
+    window.clearTimeout(messageTimer.current);
+    messageTimer.current = window.setTimeout(() => setMessage(''), 2500);
+  };
+
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('weeklyTasks');
-      if (saved) setWeeklyTasks(JSON.parse(saved));
-      const savedMind = localStorage.getItem('mindMap');
-      if (savedMind) setMindMap(savedMind);
-      const savedNotes = localStorage.getItem('freeNotes');
-      if (savedNotes) setNotes(savedNotes);
-      const savedSubjects = localStorage.getItem('studyPlan');
-      if (savedSubjects) setSubjects(JSON.parse(savedSubjects));
-    } catch (e) {
-      console.log('Storage error:', e);
+      setWeeklyTasks(JSON.parse(localStorage.getItem('weeklyTasks') || '{}'));
+      setMindMap(localStorage.getItem('mindMap') || '');
+      setNotes(localStorage.getItem('freeNotes') || '');
+      setSubjects(JSON.parse(localStorage.getItem('studyPlan') || '[]'));
+    } catch {
+      notify('تعذر تحميل البيانات المحفوظة');
     }
+    return () => window.clearTimeout(messageTimer.current);
   }, []);
 
-  // المنبه
   useEffect(() => {
-    let interval;
-    if (isRunning && timeLeft > 0) {
-      interval = setInterval(() => setTimeLeft(p => p - 1), 1000);
-    } else if (timeLeft === 0 && isRunning && minutes) {
+    if (!isRunning) return undefined;
+    if (timeLeft <= 0) {
       setIsRunning(false);
       setShowAlert(true);
+      notify('انتهى وقت المنبه');
       playAlarmSound();
+      return undefined;
     }
-    return () => clearInterval(interval);
-  }, [isRunning, timeLeft, minutes]);
+    const timer = window.setTimeout(() => setTimeLeft((value) => value - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [isRunning, timeLeft]);
 
   const playAlarmSound = () => {
     try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = audioContext.createOscillator();
-      const gain = audioContext.createGain();
-      osc.connect(gain);
-      gain.connect(audioContext.destination);
-      osc.frequency.value = 1000;
-      gain.gain.setValueAtTime(0.3, audioContext.currentTime);
-      osc.start();
-      osc.stop(audioContext.currentTime + 1);
-    } catch (e) {
-      console.log('Audio not supported');
+      const context = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.frequency.value = 1000;
+      gain.gain.setValueAtTime(0.3, context.currentTime);
+      oscillator.start();
+      oscillator.stop(context.currentTime + 1.2);
+    } catch {
+      // Audio may be unavailable in some browsers.
     }
   };
 
   const saveWeeklyTasks = () => {
-    if (selectedDay) {
-      const updated = { ...weeklyTasks, [selectedDay]: taskText };
-      setWeeklyTasks(updated);
-      localStorage.setItem('weeklyTasks', JSON.stringify(updated));
-      setSavingMessage('✓ تم حفظ المهام!');
-      setTimeout(() => setSavingMessage(''), 2000);
-    }
+    if (!selectedDay) return;
+    const updated = { ...weeklyTasks, [selectedDay]: taskText };
+    setWeeklyTasks(updated);
+    localStorage.setItem('weeklyTasks', JSON.stringify(updated));
+    notify('تم حفظ مهام اليوم');
+  };
+
+  const deleteWeeklyTasks = () => {
+    if (!selectedDay) return;
+    const updated = { ...weeklyTasks };
+    delete updated[selectedDay];
+    setWeeklyTasks(updated);
+    setTaskText('');
+    localStorage.setItem('weeklyTasks', JSON.stringify(updated));
+    notify('تم مسح مهام اليوم');
   };
 
   const saveMindMap = () => {
     localStorage.setItem('mindMap', mindMap);
-    setSavingMessage('✓ تم حفظ الخطة!');
-    setTimeout(() => setSavingMessage(''), 2000);
+    notify('تم حفظ الخطة');
   };
 
   const saveNotes = () => {
     localStorage.setItem('freeNotes', notes);
-    setSavingMessage('✓ تم حفظ الملاحظات!');
-    setTimeout(() => setSavingMessage(''), 2000);
+    notify('تم حفظ الملاحظات');
+  };
+
+  const clearNotes = () => {
+    setNotes('');
+    localStorage.removeItem('freeNotes');
+    notify('تم مسح الملاحظات');
   };
 
   const addSubject = () => {
-    if (newSubject.trim() && newHours && subjects.length < 15) {
-      const updated = [...subjects, { id: Date.now(), name: newSubject, hours: parseFloat(newHours) }];
-      setSubjects(updated);
-      localStorage.setItem('studyPlan', JSON.stringify(updated));
-      setNewSubject('');
-      setNewHours('');
-    }
+    const name = newSubject.trim();
+    const hours = Number(newHours);
+    if (!name) return notify('اكتب اسم الموضوع أولاً');
+    if (!Number.isFinite(hours) || hours <= 0) return notify('أدخل عدد ساعات صحيح');
+    if (subjects.length >= 15) return notify('الحد الأقصى 15 موضوعاً');
+    const updated = [...subjects, { id: Date.now(), name, hours }];
+    setSubjects(updated);
+    localStorage.setItem('studyPlan', JSON.stringify(updated));
+    setNewSubject('');
+    setNewHours('');
+    notify('تمت إضافة الموضوع');
   };
 
   const deleteSubject = (id) => {
-    const updated = subjects.filter(s => s.id !== id);
+    const updated = subjects.filter((subject) => subject.id !== id);
     setSubjects(updated);
     localStorage.setItem('studyPlan', JSON.stringify(updated));
+    notify('تم حذف الموضوع');
   };
 
   const startAlarm = () => {
-    if (minutes && parseInt(minutes) > 0) {
-      setTimeLeft(parseInt(minutes) * 60);
-      setIsRunning(true);
-    }
+    const value = Number(minutes);
+    if (!Number.isFinite(value) || value <= 0) return notify('أدخل عدد دقائق صحيح');
+    setTimeLeft(Math.floor(value * 60));
+    setIsRunning(true);
+    setShowAlert(false);
+    notify('بدأ المنبه');
   };
 
-  const formatTime = (s) => {
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    const sec = s % 60;
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  const stopAlarm = () => {
+    setIsRunning(false);
+    setTimeLeft(0);
+    setMinutes('');
+    setShowAlert(false);
+    notify('تم إيقاف المنبه');
   };
 
-  const totalHours = subjects.reduce((sum, s) => sum + s.hours, 0);
+  const formatTime = (seconds) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutesValue = Math.floor((seconds % 3600) / 60);
+    const secondsValue = seconds % 60;
+    return [hours, minutesValue, secondsValue].map((value) => String(value).padStart(2, '0')).join(':');
+  };
+
+  const goHome = () => {
+    setPage('home');
+    setSelectedDay(null);
+  };
+
+  const totalHours = subjects.reduce((sum, subject) => sum + subject.hours, 0);
+  const savedData = {
+    weeklyTasks,
+    mindMap,
+    freeNotes: notes,
+    studyPlan: subjects,
+  };
+
+  const downloadData = () => {
+    const blob = new Blob([JSON.stringify(savedData, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'life-organizer-backup.json';
+    link.click();
+    URL.revokeObjectURL(url);
+    notify('تم تصدير البيانات');
+  };
+
+  const clearAll = () => {
+    if (!window.confirm('هل تريد مسح جميع البيانات؟')) return;
+    ['weeklyTasks', 'mindMap', 'freeNotes', 'studyPlan'].forEach((key) => localStorage.removeItem(key));
+    setWeeklyTasks({});
+    setMindMap('');
+    setNotes('');
+    setSubjects([]);
+    notify('تم مسح جميع البيانات');
+  };
+
+  const cards = [
+    ['مهام أيام الأسبوع', 'خطط مهامك لكل يوم', '📅', 'weekly'],
+    ['الخطة الذهنية', 'اكتب خطتك الشاملة', '🧠', 'mindmap'],
+    ['تدوين حر وتذكير', 'ملاحظاتك اليومية', '📝', 'notes'],
+    ['المخطط الدراسي', 'نظم مواضيعك', '📚', 'study'],
+    ['المنبه', 'تنبيهات دقيقة', '⏰', 'alarm'],
+    ['المحفوظات الشاملة', 'اعرض بياناتك', '📦', 'archive'],
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-100 via-white to-gray-50" dir="rtl">
-      {/* Header */}
+      {message && <div className="toast-notice" role="status">{message}</div>}
       <header className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">🏠</span>
-            <h1 className="text-2xl font-bold">يومك بيدك</h1>
-          </div>
+          <button onClick={goHome} className="flex items-center gap-2 text-white" aria-label="العودة للرئيسية">
+            <span className="text-2xl">🏠</span><span className="text-2xl font-bold">يومك بيدك</span>
+          </button>
           <p className="text-sm text-purple-100">استثمره بحكمة</p>
         </div>
       </header>
 
-      {/* Home Page */}
-      {page === 'home' && (
-        <main className="max-w-6xl mx-auto px-4 py-12 pb-20">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-gradient mb-4">يومك بيدك</h2>
-            <p className="text-xl text-gray-600">استثمره بحكمة - نظم حياتك بأفضل طريقة</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              { title: 'مهام أيام الأسبوع', desc: 'خطط مهامك لكل يوم', icon: '📅', page: 'weekly' },
-              { title: 'الخطة الذهنية', desc: 'اكتب خطتك الشاملة', icon: '🧠', page: 'mindmap' },
-              { title: 'تدوين حر وتذكير', desc: 'ملاحظاتك اليومية', icon: '📝', page: 'notes' },
-              { title: 'المخطط الدراسي', desc: 'نظم مواضيعك', icon: '📚', page: 'study' },
-              { title: 'المنبه', desc: 'تنبيهات دقيقة', icon: '⏰', page: 'alarm' },
-              { title: 'المحفوظات الشاملة', desc: 'اعرض بياناتك', icon: '📦', page: 'archive' }
-            ].map((item) => (
-              <button key={item.page} onClick={() => setPage(item.page)} className="transform hover:scale-105 transition-all duration-300">
-                <div className="h-full bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-2xl">
-                  <div className={`bg-gradient-to-br from-blue-400 to-blue-600 h-32 flex items-center justify-center text-5xl`}>{item.icon}</div>
-                  <div className="p-6 text-right">
-                    <h3 className="text-xl font-bold text-gray-800 mb-2">{item.title}</h3>
-                    <p className="text-gray-600 text-sm mb-4">{item.desc}</p>
-                    <div className="flex justify-end text-purple-600 gap-1">
-                      <span>اذهب</span>
-                      <span>←</span>
-                    </div>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </main>
-      )}
-
-      {/* Weekly Tasks Page */}
-      {page === 'weekly' && (
-        <main className="max-w-6xl mx-auto px-4 py-8 pb-20">
-          <button onClick={() => setPage('home')} className="mb-6 px-4 py-2 bg-white text-gray-800 rounded-lg hover:bg-gray-100 transition">← العودة للرئيسية</button>
-          <h1 className="text-3xl font-bold text-white mb-8">مهام أيام الأسبوع</h1>
-          
-          {!selectedDay ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {days.map((day, index) => (
-                <button key={index} onClick={() => { setSelectedDay(day); setTaskText(weeklyTasks[day] || ''); }} className="transform hover:scale-105 transition-all">
-                  <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-xl text-right border-t-4 border-purple-500">
-                    <div className="text-3xl mb-3">{emojis[index]}</div>
-                    <h2 className="text-xl font-bold text-gray-800 mb-2">{day}</h2>
-                    <p className="text-sm text-gray-600">{weeklyTasks[day] ? `${weeklyTasks[day].length} حرف` : 'لا توجد مهام'}</p>
-                  </div>
-                </button>
-              ))}
+      {page === 'home' && <main className="max-w-6xl mx-auto px-4 py-12 pb-20 rtl-text">
+        <div className="text-center mb-16"><h2 className="text-4xl md:text-5xl font-bold text-gradient mb-4">يومك بيدك</h2><p className="text-xl text-gray-600">استثمره بحكمة - نظم حياتك بأفضل طريقة</p></div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {cards.map(([title, description, icon, target]) => <button key={target} onClick={() => setPage(target)} className="card-hover text-right">
+            <div className="h-full bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-2xl">
+              <div className="bg-gradient-to-br from-blue-400 to-blue-600 h-32 flex items-center justify-center text-5xl">{icon}</div>
+              <div className="p-6"><h3 className="text-xl font-bold text-gray-800 mb-2">{title}</h3><p className="text-gray-600 text-sm">{description}</p><div className="mt-4 text-purple-600 font-semibold">اذهب الآن ←</div></div>
             </div>
-          ) : (
-            <div className="bg-white rounded-2xl shadow-lg p-8">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">مهام يوم {selectedDay}</h2>
-                <button onClick={() => setSelectedDay(null)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg">← رجوع</button>
-              </div>
-              <textarea value={taskText} onChange={(e) => e.target.value.length <= 10000 && setTaskText(e.target.value)} maxLength={10000} className="w-full h-80 p-4 border-2 border-gray-300 rounded-lg resize-none text-right" placeholder="اكتب مهامك..."/>
-              <div className="text-sm text-gray-500 text-left mt-2 mb-6">{taskText.length} / 10,000 حرف</div>
-              <button onClick={saveWeeklyTasks} className="w-full px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg font-semibold">💾 حفظ</button>
-              {savingMessage && <div className="mt-4 p-3 bg-green-100 text-green-700 rounded-lg text-center">{savingMessage}</div>}
-            </div>
-          )}
-        </main>
-      )}
+          </button>)}
+        </div>
+      </main>}
 
-      {/* Mind Map Page */}
-      {page === 'mindmap' && (
-        <main className="max-w-4xl mx-auto px-4 py-8 pb-20">
-          <button onClick={() => setPage('home')} className="mb-6 px-4 py-2 bg-white text-gray-800 rounded-lg">← العودة</button>
-          <h1 className="text-3xl font-bold text-white mb-4">الخطة الذهنية 🧠</h1>
-          <div className="bg-white rounded-2xl shadow-lg p-8">
-            <textarea value={mindMap} onChange={(e) => setMindMap(e.target.value)} className="w-full h-80 p-4 border-2 border-gray-300 rounded-lg resize-none text-right" placeholder="اكتب خطتك..."/>
-            <div className="text-sm text-gray-500 text-left mt-2 mb-6">{mindMap.length} حرف</div>
-            <button onClick={saveMindMap} className="w-full px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg font-semibold">💾 حفظ</button>
-            {savingMessage && <div className="mt-4 p-3 bg-green-100 text-green-700 rounded-lg text-center">{savingMessage}</div>}
-          </div>
-        </main>
-      )}
+      {page === 'weekly' && <main className="max-w-6xl mx-auto px-4 py-8 pb-20 rtl-text">
+        <button onClick={goHome} className="mb-6 px-4 py-2 bg-white rounded-lg">← العودة للرئيسية</button><h1 className="text-3xl font-bold text-gradient mb-8">مهام أيام الأسبوع</h1>
+        {!selectedDay ? <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">{days.map((day, index) => <button key={day} onClick={() => { setSelectedDay(day); setTaskText(weeklyTasks[day] || ''); }} className="bg-white p-6 rounded-xl shadow-md text-right border-t-4 border-purple-500"><div className="text-3xl mb-3">{emojis[index]}</div><h2 className="text-xl font-bold text-gray-800 mb-2">{day}</h2><p className="text-sm text-gray-600">{weeklyTasks[day] ? `${weeklyTasks[day].length} حرف` : 'لا توجد مهام'}</p></button>)}</div> : <div className="bg-white rounded-2xl shadow-lg p-8"><div className="flex justify-between items-center mb-6 gap-3"><h2 className="text-2xl font-bold text-gray-800">مهام يوم {selectedDay}</h2><button onClick={() => setSelectedDay(null)} className="px-4 py-2 bg-gray-200 rounded-lg">← رجوع</button></div><textarea value={taskText} onChange={(event) => setTaskText(event.target.value)} maxLength={10000} className="rtl-text w-full h-80 p-4 border-2 border-gray-300 rounded-lg resize-none" placeholder="اكتب مهامك لهذا اليوم..." /><div className="text-sm text-gray-500 text-left mt-2 mb-6">{taskText.length} / 10,000 حرف</div><div className="flex gap-3 flex-wrap"><button onClick={saveWeeklyTasks} className="px-6 py-3 btn-gradient text-white rounded-lg font-semibold">حفظ المهام</button>{weeklyTasks[selectedDay] && <button onClick={deleteWeeklyTasks} className="px-6 py-3 bg-red-500 text-white rounded-lg font-semibold">مسح</button>}</div></div>}
+      </main>}
 
-      {/* Free Notes Page */}
-      {page === 'notes' && (
-        <main className="max-w-4xl mx-auto px-4 py-8 pb-20">
-          <button onClick={() => setPage('home')} className="mb-6 px-4 py-2 bg-white text-gray-800 rounded-lg">← العودة</button>
-          <h1 className="text-3xl font-bold text-white mb-4">ملاحظاتي 📝</h1>
-          <div className="bg-white rounded-2xl shadow-lg p-8">
-            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full h-80 p-4 border-2 border-gray-300 rounded-lg resize-none text-right" placeholder="اكتب ملاحظاتك..."/>
-            <div className="text-sm text-gray-500 text-left mt-2 mb-6">{notes.length} حرف</div>
-            <button onClick={saveNotes} className="w-full px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg font-semibold">💾 حفظ</button>
-            {savingMessage && <div className="mt-4 p-3 bg-green-100 text-green-700 rounded-lg text-center">{savingMessage}</div>}
-          </div>
-        </main>
-      )}
+      {page === 'mindmap' && <main className="max-w-4xl mx-auto px-4 py-8 pb-20 rtl-text"><button onClick={goHome} className="mb-6 px-4 py-2 bg-white rounded-lg">← العودة</button><h1 className="text-3xl font-bold text-gradient mb-4">الخطة الذهنية</h1><div className="bg-white rounded-2xl shadow-lg p-8"><textarea value={mindMap} onChange={(event) => setMindMap(event.target.value)} className="rtl-text w-full h-80 p-4 border-2 border-gray-300 rounded-lg resize-none" placeholder="اكتب خطتك الشاملة..." /><div className="text-sm text-gray-500 text-left mt-2 mb-6">{mindMap.length} حرف</div><button onClick={saveMindMap} className="w-full px-6 py-3 btn-gradient text-white rounded-lg font-semibold">حفظ الخطة</button></div></main>}
 
-      {/* Study Plan Page */}
-      {page === 'study' && (
-        <main className="max-w-4xl mx-auto px-4 py-8 pb-20">
-          <button onClick={() => setPage('home')} className="mb-6 px-4 py-2 bg-white text-gray-800 rounded-lg">← العودة</button>
-          <h1 className="text-3xl font-bold text-white mb-4">المخطط الدراسي 📚</h1>
-          <div className="bg-white rounded-2xl shadow-lg p-8">
-            <div className="mb-6 p-4 bg-purple-50 rounded-lg border-2 border-purple-200">
-              <input type="text" value={newSubject} onChange={(e) => setNewSubject(e.target.value)} placeholder="اسم الموضوع" className="w-full mb-2 p-2 border rounded text-right"/>
-              <input type="number" value={newHours} onChange={(e) => setNewHours(e.target.value)} placeholder="الساعات" step="0.5" className="w-full mb-2 p-2 border rounded text-right"/>
-              <button onClick={addSubject} className="w-full px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded">➕ إضافة</button>
-            </div>
+      {page === 'notes' && <main className="max-w-4xl mx-auto px-4 py-8 pb-20 rtl-text"><button onClick={goHome} className="mb-6 px-4 py-2 bg-white rounded-lg">← العودة</button><h1 className="text-3xl font-bold text-gradient mb-4">ملاحظاتي</h1><div className="bg-white rounded-2xl shadow-lg p-8"><textarea value={notes} onChange={(event) => setNotes(event.target.value)} className="rtl-text w-full h-80 p-4 border-2 border-gray-300 rounded-lg resize-none" placeholder="اكتب ملاحظاتك..." /><div className="text-sm text-gray-500 text-left mt-2 mb-6">{notes.length} حرف</div><div className="flex gap-3 flex-wrap"><button onClick={clearNotes} className="px-6 py-3 bg-red-500 text-white rounded-lg font-semibold">مسح الملاحظات</button><button onClick={saveNotes} className="px-6 py-3 btn-gradient text-white rounded-lg font-semibold">حفظ الملاحظات</button></div></div></main>}
 
-            {subjects.length > 0 && (
-              <>
-                <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-3 rounded mb-4 font-bold flex justify-between">
-                  <span>الإجمالي: {totalHours} ساعة</span>
-                </div>
-                <div className="space-y-2">
-                  {subjects.map((s) => (
-                    <div key={s.id} className="flex justify-between p-3 bg-gray-100 rounded text-right">
-                      <span>{s.name}</span>
-                      <div className="flex gap-2 items-center">
-                        <span>{s.hours}h</span>
-                        <button onClick={() => deleteSubject(s.id)} className="text-red-500">🗑️</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        </main>
-      )}
+      {page === 'study' && <main className="max-w-4xl mx-auto px-4 py-8 pb-20 rtl-text"><button onClick={goHome} className="mb-6 px-4 py-2 bg-white rounded-lg">← العودة</button><h1 className="text-3xl font-bold text-gradient mb-4">المخطط الدراسي</h1><div className="bg-white rounded-2xl shadow-lg p-8"><div className="mb-6 p-4 bg-purple-50 rounded-lg"><input value={newSubject} onChange={(event) => setNewSubject(event.target.value)} placeholder="اسم الموضوع" className="rtl-text w-full mb-2 p-3 border rounded-lg" /><input type="number" value={newHours} onChange={(event) => setNewHours(event.target.value)} placeholder="عدد الساعات" min="0.5" step="0.5" className="rtl-text w-full mb-2 p-3 border rounded-lg" /><button onClick={addSubject} className="w-full px-4 py-3 btn-gradient text-white rounded-lg font-semibold">إضافة موضوع</button></div>{subjects.length > 0 && <><div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-3 rounded mb-4 font-bold">الإجمالي: {totalHours} ساعة</div><div className="space-y-2">{subjects.map((subject) => <div key={subject.id} className="flex justify-between items-center p-3 bg-gray-100 rounded"><span>{subject.name}</span><span className="flex items-center gap-3"><span>{subject.hours} ساعة</span><button onClick={() => deleteSubject(subject.id)} className="text-red-500" aria-label={`حذف ${subject.name}`}>🗑️</button></span></div>)}</div></>}</div></main>}
 
-      {/* Alarm Page */}
-      {page === 'alarm' && (
-        <main className="max-w-2xl mx-auto px-4 py-20 flex flex-col items-center">
-          <button onClick={() => setPage('home')} className="mb-6 px-4 py-2 bg-white text-gray-800 rounded-lg">← العودة</button>
-          <h1 className="text-3xl font-bold text-white mb-12">المنبه ⏰</h1>
-          <div className="bg-white rounded-2xl p-8 w-full">
-            {!isRunning ? (
-              <>
-                <input type="number" value={minutes} onChange={(e) => setMinutes(e.target.value)} placeholder="الدقائق" className="w-full text-3xl p-4 border-4 border-purple-500 rounded-lg mb-6 text-center"/>
-                <button onClick={startAlarm} className="w-full px-8 py-6 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xl font-bold rounded">▶️ ابدأ</button>
-              </>
-            ) : (
-              <>
-                <div className="text-6xl font-bold text-center mb-6 p-6 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded">{formatTime(timeLeft)}</div>
-                <button onClick={() => { setIsRunning(false); setTimeLeft(0); setMinutes(''); }} className="w-full px-8 py-6 bg-red-500 text-white text-xl font-bold rounded">⏹️ إيقاف</button>
-              </>
-            )}
-          </div>
-          {showAlert && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-2xl p-8 text-center max-w-sm">
-                <div className="text-6xl mb-4">🔔</div>
-                <h2 className="text-3xl font-bold text-red-600 mb-4">انتهى الوقت!</h2>
-                <button onClick={() => setShowAlert(false)} className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded">تمام</button>
-              </div>
-            </div>
-          )}
-        </main>
-      )}
+      {page === 'alarm' && <main className="max-w-2xl mx-auto px-4 py-20 flex flex-col items-center rtl-text"><button onClick={goHome} className="mb-6 px-4 py-2 bg-white rounded-lg">← العودة</button><h1 className="text-3xl font-bold text-gradient mb-12">المنبه</h1><div className="bg-white rounded-2xl p-8 w-full">{!isRunning ? <><input type="number" value={minutes} onChange={(event) => setMinutes(event.target.value)} min="1" placeholder="عدد الدقائق" className="rtl-text w-full text-3xl p-4 border-4 border-purple-500 rounded-lg mb-6" /><button onClick={startAlarm} className="w-full px-8 py-6 btn-gradient text-white text-xl font-bold rounded-lg">ابدأ المنبه</button></> : <><div className="text-6xl font-bold text-center mb-6 p-6 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg" dir="ltr">{formatTime(timeLeft)}</div><button onClick={stopAlarm} className="w-full px-8 py-6 bg-red-500 text-white text-xl font-bold rounded-lg">إيقاف المنبه</button></>}</div>{showAlert && <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-2xl p-8 text-center max-w-sm w-full"><div className="text-6xl mb-4">🔔</div><h2 className="text-3xl font-bold text-red-600 mb-4">انتهى الوقت!</h2><button onClick={() => setShowAlert(false)} className="px-6 py-3 btn-gradient text-white rounded-lg">تم</button></div></div>}</main>}
 
-      {/* Archive Page */}
-      {page === 'archive' && (
-        <main className="max-w-4xl mx-auto px-4 py-8 pb-20">
-          <button onClick={() => setPage('home')} className="mb-6 px-4 py-2 bg-white text-gray-800 rounded-lg">← العودة</button>
-          <h1 className="text-3xl font-bold text-white mb-8">المحفوظات 📦</h1>
-          <div className="bg-white rounded-2xl shadow-lg p-8 space-y-4">
-            <div className="p-4 bg-blue-50 rounded-lg">
-              <h2 className="font-bold text-lg text-blue-700 mb-3">📅 المهام</h2>
-              {Object.keys(weeklyTasks).length ? Object.entries(weeklyTasks).map(([day, tasks]) => (
-                <div key={day} className="p-2 mb-2 bg-white rounded text-right text-sm">
-                  <strong>{day}:</strong> {tasks.substring(0, 50)}...
-                </div>
-              )) : <p className="text-gray-500 text-center">لا توجد</p>}
-            </div>
-          </div>
-        </main>
-      )}
+      {page === 'archive' && <main className="max-w-4xl mx-auto px-4 py-8 pb-20 rtl-text"><button onClick={goHome} className="mb-6 px-4 py-2 bg-white rounded-lg">← العودة</button><h1 className="text-3xl font-bold text-gradient mb-8">المحفوظات</h1><div className="bg-white rounded-2xl shadow-lg p-8"><h2 className="font-bold text-lg text-blue-700 mb-3">مهام الأسبوع</h2>{Object.keys(weeklyTasks).length ? Object.entries(weeklyTasks).map(([day, tasks]) => <div key={day} className="p-3 mb-2 bg-blue-50 rounded"><strong>{day}:</strong> {tasks}</div>) : <p className="text-gray-500">لا توجد مهام مؤرشفة</p>}<div className="flex gap-3 flex-wrap mt-8"><button onClick={downloadData} className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold">تصدير البيانات</button><button onClick={clearAll} className="px-6 py-3 bg-red-500 text-white rounded-lg font-semibold">مسح جميع البيانات</button></div></div></main>}
     </div>
   );
 }
