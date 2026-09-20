@@ -3,10 +3,11 @@
 @import 'tailwindcss/utilities';
 
 * {
-  direction: rtl;
+  box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   font-family: 'Cairo', 'Tajawal', sans-serif;
@@ -14,8 +15,21 @@ html, body {
   min-height: 100vh;
 }
 
+body {
+  direction: rtl;
+  text-align: right;
+}
+
 #root {
   min-height: 100vh;
+}
+
+.rtl-text {
+  direction: rtl;
+  unicode-bidi: plaintext;
+  text-align: right;
+  line-height: 1.7;
+  word-break: break-word;
 }
 
 .text-gradient {
@@ -48,10 +62,26 @@ html, body {
   scroll-behavior: smooth;
 }
 
-.text-right {
-  text-align: right;
+.toast-notice {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  z-index: 9999;
+  background: rgba(15, 23, 42, 0.92);
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 9999px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+  font-weight: 700;
+  white-space: nowrap;
 }
 
-.text-left {
-  text-align: left;
+.text-right { text-align: right; }
+.text-left { text-align: left; }
+
+textarea,
+input {
+  direction: rtl;
+  text-align: right;
 }
